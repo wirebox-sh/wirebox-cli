@@ -5,6 +5,7 @@ import { CLI_VERSION } from "./client.js";
 import { registerIdentityCommands } from "./commands/identity.js";
 import { registerMailCommands } from "./commands/mail.js";
 import { registerSignupCommands } from "./commands/signup.js";
+import { registerTunnelCommands } from "./commands/tunnel.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
 
 const program = new Command()
@@ -19,5 +20,6 @@ registerWhoamiCommand(program);
 registerSignupCommands(program);
 registerIdentityCommands(program);
 registerMailCommands(program);
+registerTunnelCommands(program);
 
 program.parse();

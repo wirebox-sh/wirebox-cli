@@ -11,6 +11,7 @@ const IDENTITY_COLUMNS = [
   "agent_handle",
   "display_name",
   "email_address",
+  "public_url",
   "status",
   "created_at",
 ];
@@ -19,7 +20,7 @@ export function registerIdentityCommands(program: Command): void {
   function attachIdentitySubcommands(parent: Command) {
     parent
       .command("create")
-      .description("Create a new agent identity with an atomic dedicated mailbox")
+      .description("Create a new agent identity with an atomic dedicated mailbox and tunnel")
       .requiredOption("--handle <handle>", "Globally unique agent handle (e.g. sales-bot)")
       .option("--display-name <name>", "Human-friendly display name")
       .option("--description <desc>", "Agent role or description")
@@ -42,6 +43,7 @@ export function registerIdentityCommands(program: Command): void {
               agent_handle: agent.agent_handle,
               display_name: agent.display_name,
               email_address: agent.mailbox.email_address,
+              public_url: agent.tunnel.public_url,
               status: agent.status,
               created_at: agent.created_at,
             },
@@ -78,6 +80,7 @@ export function registerIdentityCommands(program: Command): void {
             agent_handle: item.agent_handle,
             display_name: item.display_name,
             email_address: item.mailbox.email_address,
+            public_url: item.tunnel?.public_url || "-",
             status: item.status,
             created_at: item.created_at.slice(0, 19).replace("T", " "),
           }));
@@ -88,7 +91,7 @@ export function registerIdentityCommands(program: Command): void {
 
     parent
       .command("get [handle]")
-      .description("Get profile details and mailbox status for an agent identity")
+      .description("Get profile details, mailbox status, and tunnel for an agent identity")
       .action(
         withErrorHandler(async function (this: Command, handle?: string) {
           const opts = getGlobalOpts(this);
@@ -103,6 +106,8 @@ export function registerIdentityCommands(program: Command): void {
               description: agent.description || "-",
               email_address: agent.mailbox.email_address,
               mailbox_id: agent.mailbox.id || "-",
+              public_url: agent.tunnel?.public_url || "-",
+              tunnel_status: agent.tunnel?.status || "-",
               status: agent.status,
               created_at: agent.created_at,
               updated_at: agent.updated_at,
