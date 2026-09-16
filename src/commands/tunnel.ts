@@ -5,7 +5,7 @@
  */
 
 import { Command } from "commander";
-import { createClient, getGlobalOpts } from "../client.js";
+import { CLI_VERSION, createClient, getGlobalOpts } from "../client.js";
 import { withErrorHandler } from "../errors.js";
 import { output } from "../output.js";
 
@@ -134,7 +134,7 @@ export function registerTunnelCommands(program: Command): void {
 
           const session = await client.tunnels.connect(handleOrId, {
             forwardTo: target,
-            clientVersion: "wirebox-cli/0.1.0",
+            clientVersion: `wirebox-cli/${CLI_VERSION}`,
             onStatusChange: (status) => {
               if (status.connected) {
                 console.log(`[Status] Connected to Wirebox Edge`);
@@ -183,7 +183,7 @@ export function registerTunnelCommands(program: Command): void {
 
           const session = await client.tunnels.connect(handleOrId, {
             forwardTo: dest,
-            clientVersion: "wirebox-cli/0.1.0",
+            clientVersion: `wirebox-cli/${CLI_VERSION}`,
             onStatusChange: (status) => {
               if (status.connected) {
                 console.log(`[Status] Connected to Wirebox Edge`);
