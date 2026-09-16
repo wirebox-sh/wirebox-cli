@@ -1,6 +1,6 @@
 {
   "name": "@wirebox-sh/cli",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Official CLI for Wirebox — Real-world identity and communication layer for AI agents",
   "license": "MIT",
   "publishConfig": {
@@ -41,7 +41,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@wirebox-sh/sdk": "^0.2.0",
+    "@wirebox-sh/sdk": "^0.2.1",
     "commander": "^13.1.0"
   },
   "devDependencies": {
