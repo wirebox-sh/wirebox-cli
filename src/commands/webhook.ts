@@ -310,8 +310,9 @@ export function registerWebhookCommands(program: Command): void {
       .option("--payload-file <file>", "Path to file containing raw JSON payload")
       .requiredOption("--signature <sig>", "The x-wirebox-signature header value")
       .requiredOption("--secret <secret>", "Webhook signing secret (whsec_...)")
+      .option("--request-id <id>", "The x-wirebox-request-id header value (req_...)")
       .option("--timestamp <ts>", "Optional explicit unix timestamp or ISO string")
-      .option("--tolerance <seconds>", "Tolerance window in seconds (default: 300)", (v) =>
+      .option("--tolerance <seconds>", "Tolerance window in seconds (default: 300, 0 to disable)", (v) =>
         parseInt(v, 10)
       )
       .action(
@@ -322,6 +323,7 @@ export function registerWebhookCommands(program: Command): void {
             payloadFile?: string;
             signature: string;
             secret: string;
+            requestId?: string;
             timestamp?: string;
             tolerance?: number;
           }
@@ -344,6 +346,9 @@ export function registerWebhookCommands(program: Command): void {
           };
           if (cmdOpts.timestamp) {
             headers["x-wirebox-timestamp"] = cmdOpts.timestamp;
+          }
+          if (cmdOpts.requestId) {
+            headers["x-wirebox-request-id"] = cmdOpts.requestId;
           }
 
           try {
