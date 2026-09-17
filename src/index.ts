@@ -3,6 +3,7 @@
 import { Command } from "commander";
 import { CLI_VERSION } from "./client.js";
 import { registerIdentityCommands } from "./commands/identity.js";
+import { registerIMessageCommands } from "./commands/imessage.js";
 import { registerMailCommands } from "./commands/mail.js";
 import { registerSignupCommands } from "./commands/signup.js";
 import { registerTunnelCommands } from "./commands/tunnel.js";
@@ -21,6 +22,7 @@ registerWhoamiCommand(program);
 registerSignupCommands(program);
 registerIdentityCommands(program);
 registerMailCommands(program);
+registerIMessageCommands(program);
 registerTunnelCommands(program);
 registerWebhookCommands(program);
 
