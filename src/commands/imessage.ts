@@ -30,7 +30,7 @@ const MESSAGE_COLUMNS = [
 export function registerIMessageCommands(program: Command): void {
   const imessage = program
     .command("imessage")
-    .description("Apple iMessage real-world communication channel for AI agents");
+    .description("iMessage real-world communication channel for AI agents");
 
   // 1. wirebox imessage router [handle]
   imessage
