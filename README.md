@@ -128,6 +128,34 @@ wirebox mail delete -i sales-bot <message-id>
 
 ---
 
+### 5. Mobile & Desktop Agent Connect (`wirebox connect`)
+
+Bridge phone iMessage, SMS, and email directly to local AI coding agents running on your machine:
+
+```bash
+# Check installed agent drivers (Claude Code, Hermes, OpenAI Codex, OpenCode)
+wirebox connect drivers
+
+# Run connectivity diagnostics
+wirebox connect doctor
+
+# Connect phone iMessage & email directly to local Claude Code agent
+wirebox connect @sales-bot --driver claude-code
+
+# Connect to Hermes Agent with session memory
+wirebox connect @sales-bot --driver hermes
+
+# First-time interactive setup wizard
+wirebox connect init
+
+# Install as background macOS daemon (starts on boot via launchd)
+wirebox connect daemon install
+wirebox connect daemon status
+wirebox connect daemon logs
+```
+
+---
+
 ## Output Formats & Agent Integration
 
 By default, the CLI formats responses into readable ASCII tables and records.

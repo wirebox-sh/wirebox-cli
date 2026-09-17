@@ -29,14 +29,21 @@ wirebox-cli/
 │   ├── client.ts               # Wirebox SDK client factory and CLI_VERSION constant
 │   ├── errors.ts               # CLI user-facing error formatting
 │   ├── output.ts               # Table, key-value, and JSON formatting helpers
-│   └── commands/
-│       ├── whoami.ts           # wirebox whoami / me
-│       ├── signup.ts           # wirebox signup / verify (autonomous onboarding)
-│       ├── identity.ts         # wirebox identity (create, list, get, delete)
-│       ├── mail.ts             # wirebox mail (list, send, read, reply)
-│       ├── tunnel.ts           # wirebox tunnel (list, get, connect, forward)
-│       └── webhook.ts          # wirebox webhook (list, create, ping, rotate-secret)
-├── tests/                      # Vitest test suites (16+ tests)
+│   ├── commands/
+│   │   ├── whoami.ts           # wirebox whoami / me
+│   │   ├── signup.ts           # wirebox signup / verify (autonomous onboarding)
+│   │   ├── identity.ts         # wirebox identity (create, list, get, delete)
+│   │   ├── mail.ts             # wirebox mail (list, send, read, reply)
+│   │   ├── imessage.ts         # wirebox imessage (chat, send, reply)
+│   │   ├── tunnel.ts           # wirebox tunnel (list, get, connect, forward)
+│   │   ├── webhook.ts          # wirebox webhook (list, create, ping, rotate-secret)
+│   │   └── connect.ts          # wirebox connect (phone iMessage/SMS/email -> local agents)
+│   └── connect/                # Agent Connect runtime & drivers
+│       ├── drivers/            # Claude Code, Hermes, OpenAI Codex, OpenCode
+│       ├── core/               # Tunnel listener, session manager, prompt framer
+│       ├── daemon/             # macOS launchd background service
+│       └── ui/                 # Doctor, interactive wizard, use-case simulation
+├── tests/                      # Vitest test suites (47+ tests)
 ├── package.json                # Package metadata, bin definition, and dependencies
 ├── tsup.config.ts              # ESM bundle configuration
 └── tsconfig.json               # TypeScript configuration

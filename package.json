@@ -1,6 +1,6 @@
 {
   "name": "@wirebox-sh/cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Official CLI for Wirebox — Real-world identity and communication layer for AI agents",
   "license": "MIT",
   "publishConfig": {
@@ -27,7 +27,9 @@
     "agent",
     "ai",
     "email",
-    "identity"
+    "identity",
+    "connect",
+    "imessage"
   ],
   "homepage": "https://wirebox.sh",
   "repository": {
@@ -43,11 +45,13 @@
   "dependencies": {
     "@wirebox-sh/sdk": "^0.3.0",
     "commander": "^13.1.0",
-    "qrcode-terminal": "^0.12.0"
+    "qrcode-terminal": "^0.12.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/qrcode-terminal": "^0.12.2",
+    "@types/ws": "^8.5.10",
     "tsup": "^8.0.2",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
