@@ -261,48 +261,4 @@ export function registerIMessageCommands(program: Command): void {
         );
       })
     );
-
-  // 6. wirebox imessage users (gateway user allowlist)
-  const users = imessage
-    .command("users")
-    .description("Manage iMessage gateway registered users and line routing");
-
-  users
-    .command("list")
-    .description("List registered phone numbers on iMessage gateway")
-    .action(
-      withErrorHandler(async function (this: Command) {
-        const opts = getGlobalOpts(this);
-        const client = createClient(opts);
-        const res = await client.imessage.users.list();
-        output(res.data, {
-          json: !!opts.json,
-          columns: ["id", "phone_number", "assigned_router_number", "created_at"],
-        });
-      })
-    );
-
-  users
-    .command("add <phone>")
-    .description("Pre-provision a phone number on the gateway")
-    .action(
-      withErrorHandler(async function (this: Command, phone: string) {
-        const opts = getGlobalOpts(this);
-        const client = createClient(opts);
-        const res = await client.imessage.users.add(phone);
-        output(res, { json: !!opts.json });
-      })
-    );
-
-  users
-    .command("remove <phone>")
-    .description("Remove a phone number from the gateway")
-    .action(
-      withErrorHandler(async function (this: Command, phone: string) {
-        const opts = getGlobalOpts(this);
-        const client = createClient(opts);
-        const res = await client.imessage.users.remove(phone);
-        output(res, { json: !!opts.json });
-      })
-    );
 }

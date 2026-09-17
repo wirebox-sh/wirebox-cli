@@ -20,14 +20,7 @@ describe("iMessage CLI Commands", () => {
     expect(subNames).toContain("disconnect");
     expect(subNames).toContain("messages");
     expect(subNames).toContain("send");
-    expect(subNames).toContain("users");
-
-    const usersCmd = imessageCmd!.commands.find((c) => c.name() === "users");
-    expect(usersCmd).toBeDefined();
-    const userSubNames = usersCmd!.commands.map((c) => c.name());
-    expect(userSubNames).toContain("list");
-    expect(userSubNames).toContain("add");
-    expect(userSubNames).toContain("remove");
+    expect(subNames).not.toContain("users");
   });
 
   it("router command fetches and outputs router details", async () => {
