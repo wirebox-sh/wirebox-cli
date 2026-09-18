@@ -43,7 +43,7 @@ export function registerWebhookCommands(program: Command): void {
       .description("List webhook subscriptions in your organization")
       .option("--agent <handle>", "Filter by agent handle (e.g. sales-bot)")
       .option("--mailbox <email>", "Filter by mailbox address or ID")
-      .option("--event <event>", "Filter by subscribed event (e.g. message.received)")
+      .option("--event <event>", "Filter by subscribed event (e.g. email.received, sms.received)")
       .option("--limit <n>", "Maximum records to return", (v) => parseInt(v, 10))
       .option("--offset <n>", "Pagination offset", (v) => parseInt(v, 10))
       .action(

@@ -44,17 +44,19 @@ describe("Webhook Parser & Verifier", () => {
     expect(parsed?.mediaUrls).toEqual(["https://example.com/screenshot.png"]);
   });
 
-  it("parses email message.received webhook payload", () => {
+  it("parses email.received webhook payload", () => {
     const payload = {
-      event: "message.received",
+      event_type: "email.received",
       data: {
-        id: "msg_email_202",
-        from: "developer@example.com",
-        to: "bot@wirebox.sh",
-        subject: "Deploy to staging",
-        text: "Please trigger staging deployment",
-        body_text: "Please trigger staging deployment",
-        created_at: "2026-09-17T12:05:00Z",
+        message: {
+          id: "msg_email_202",
+          mailbox_address: "bot@wirebox.sh",
+          from: "developer@example.com",
+          to: ["bot@wirebox.sh"],
+          subject: "Deploy to staging",
+          snippet: "Please trigger staging deployment",
+          created_at: "2026-09-17T12:05:00Z",
+        },
       },
     };
 
@@ -64,5 +66,28 @@ describe("Webhook Parser & Verifier", () => {
     expect(parsed?.sender).toBe("developer@example.com");
     expect(parsed?.subject).toBe("Deploy to staging");
     expect(parsed?.text).toBe("Please trigger staging deployment");
+  });
+
+  it("parses sms.received webhook payload", () => {
+    const payload = {
+      event_type: "sms.received",
+      data: {
+        message: {
+          id: "msg_sms_303",
+          channel: "sms",
+          phone_number: "+14232190980",
+          from_number: "+15551234567",
+          to_numbers: ["+14232190980"],
+          text: "Verification code 987654",
+        },
+      },
+    };
+
+    const parsed = parseWebhookPayload(payload);
+    expect(parsed).toBeDefined();
+    expect(parsed?.channel).toBe("sms");
+    expect(parsed?.sender).toBe("+15551234567");
+    expect(parsed?.recipient).toBe("+14232190980");
+    expect(parsed?.text).toBe("Verification code 987654");
   });
 });
