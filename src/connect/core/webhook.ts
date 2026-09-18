@@ -37,19 +37,22 @@ export function parseWebhookPayload(payload: any): InboundEvent | null {
     };
   }
 
-  // 2. Email Inbound Event: message.received
-  if (eventType === "message.received" || eventType === "email.received") {
+  // 2. Email Inbound Event: email.received
+  if (eventType === "email.received") {
+    const msg = data.message || data;
     const from =
-      typeof data.from_address === "string"
-        ? data.from_address
-        : data.from?.address || data.from || data.sender;
+      typeof msg.from_address === "string"
+        ? msg.from_address
+        : msg.from?.address || msg.from || msg.sender;
     const to =
-      Array.isArray(data.to_addresses) && data.to_addresses[0]
-        ? typeof data.to_addresses[0] === "string"
-          ? data.to_addresses[0]
-          : data.to_addresses[0].address
-        : data.recipient || data.to;
-    const text = data.text_body || data.body_text || data.snippet || "";
+      Array.isArray(msg.to_addresses) && msg.to_addresses[0]
+        ? typeof msg.to_addresses[0] === "string"
+          ? msg.to_addresses[0]
+          : msg.to_addresses[0].address
+        : Array.isArray(msg.to) && msg.to[0]
+          ? msg.to[0]
+          : msg.recipient || msg.to;
+    const text = msg.text_body || msg.body_text || msg.snippet || msg.text || "";
 
     if (!from) return null;
 
@@ -58,18 +61,23 @@ export function parseWebhookPayload(payload: any): InboundEvent | null {
       channel: "email",
       sender: String(from),
       recipient: String(to || "agent"),
-      subject: data.subject || undefined,
+      subject: msg.subject || undefined,
       text: String(text),
       timestamp: payload.created_at || new Date().toISOString(),
       raw: payload,
     };
   }
 
-  // 3. SMS Inbound Event: sms.received or text.received
+  // 3. SMS Inbound Event: sms.received
   if (eventType === "sms.received" || eventType === "text.received") {
-    const sender = data.from || data.sender;
-    const recipient = data.to || data.recipient;
-    const text = data.text || data.body || "";
+    const msg = data.message || data;
+    const sender = msg.from_number || msg.from || msg.sender;
+    const recipient =
+      (Array.isArray(msg.to_numbers) ? msg.to_numbers[0] : null) ||
+      msg.phone_number ||
+      msg.to ||
+      msg.recipient;
+    const text = msg.text || msg.body || "";
 
     if (!sender || !text) return null;
 
@@ -77,7 +85,7 @@ export function parseWebhookPayload(payload: any): InboundEvent | null {
       id: payload.id || `evt_${Date.now()}`,
       channel: "sms",
       sender: String(sender),
-      recipient: String(recipient),
+      recipient: String(recipient || "agent"),
       text: String(text),
       timestamp: payload.created_at || new Date().toISOString(),
       raw: payload,

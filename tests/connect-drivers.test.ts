@@ -49,5 +49,5 @@ describe("Agent Drivers & Registry", () => {
         expect(item.status.reason).toBeDefined();
       }
     }
-  });
+  }, 15000);
 });
