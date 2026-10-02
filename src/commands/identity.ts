@@ -172,9 +172,4 @@ export function registerIdentityCommands(program: Command): void {
     .command("identity")
     .description("Manage agent identities and digital personas");
   attachIdentitySubcommands(identityCmd);
-
-  const idCmd = program
-    .command("id")
-    .description("Alias for 'identity'");
-  attachIdentitySubcommands(idCmd);
 }

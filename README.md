@@ -128,39 +128,81 @@ wirebox mail delete -i sales-bot <message-id>
 
 ---
 
-### 5. Mobile & Desktop Agent Connect (`wirebox connect`)
+### 5. Phone & SMS Numbers (`wirebox phone`)
 
-Bridge phone iMessage, SMS, and email directly to local AI coding agents running on your machine:
+Provision local phone numbers and send/read SMS/MMS messages:
 
 ```bash
-# Check installed agent drivers (Claude Code, Hermes, OpenAI Codex, OpenCode)
-wirebox connect drivers
+# Provision a dedicated phone number for an agent
+wirebox phone provision --handle sales-bot --country US
 
-# Run connectivity diagnostics
-wirebox connect doctor
+# List provisioned numbers in organization
+wirebox phone numbers
 
-# Connect phone iMessage & email directly to local Claude Code agent
-wirebox connect @sales-bot --driver claude-code
+# Send an outbound SMS
+wirebox phone send --from +15551234567 --to +15559876543 --text "Your verification code is 123456"
 
-# Connect to Hermes Agent with session memory
-wirebox connect @sales-bot --driver hermes
-
-# First-time interactive setup wizard
-wirebox connect init
-
-# Install as background macOS daemon (starts on boot via launchd)
-wirebox connect daemon install
-wirebox connect daemon status
-wirebox connect daemon logs
+# List recent SMS messages
+wirebox phone messages --limit 10
 ```
 
 ---
 
-## Output Formats & Agent Integration
+### 6. iMessage Communication (`wirebox imessage`)
 
-By default, the CLI formats responses into readable ASCII tables and records.
+Equip agents with real-world iMessage reachability:
 
-When invoked with `--json`, output is formatted as indented JSON, ideal for piping to `jq` or direct consumption by AI agents (e.g. Claude Code bash tools):
+```bash
+# Display the iMessage router QR code & connection string
+wirebox imessage router --agent sales-bot
+
+# List active iMessage conversations
+wirebox imessage list -i sales-bot
+
+# Send an iMessage to an active conversation
+wirebox imessage send -i sales-bot --to +15559876543 --text "Hello over iMessage!"
+```
+
+---
+
+### 7. Network Tunnels (`wirebox tunnel`)
+
+Expose local development servers to the internet with agent-branded public URLs:
+
+```bash
+# Connect local port 3000 to the agent's public tunnel URL
+wirebox tunnel connect sales-bot --port 3000
+
+# Inspect active tunnel telemetry
+wirebox tunnel get sales-bot
+```
+
+---
+
+### 8. Webhook Subscriptions (`wirebox webhook`)
+
+```bash
+# Create a webhook endpoint for real-time events
+wirebox webhook create \
+  --url https://api.myagent.com/webhooks \
+  --events message.received,imessage.received
+
+# List registered webhooks
+wirebox webhook list
+```
+
+---
+
+## Agent & MCP Integration
+
+Wirebox Core provides a native **Streamable HTTP MCP (Model Context Protocol)** endpoint at `https://api.wirebox.sh/api/v1/mcp`. Autonomous agents (Claude Code, Cursor, Windsurf) can connect directly to Wirebox with zero local background processes:
+
+```bash
+# Add Wirebox MCP tools directly to Claude Code
+claude mcp add wirebox https://api.wirebox.sh/api/v1/mcp -H "Authorization: Bearer $WIREBOX_API_KEY"
+```
+
+For shell scripting and tool use, use `--json` for structured output:
 
 ```bash
 wirebox mail list -i sales-bot --json | jq '.messages[0].subject'

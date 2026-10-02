@@ -19,7 +19,6 @@ describe("CLI Command Registration", () => {
     expect(commandNames).toContain("signup");
     expect(commandNames).toContain("verify");
     expect(commandNames).toContain("identity");
-    expect(commandNames).toContain("id");
     expect(commandNames).toContain("mail");
   });
 

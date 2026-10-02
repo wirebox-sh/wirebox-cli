@@ -3,13 +3,12 @@ import { Command } from "commander";
 import { registerTunnelCommands } from "../src/commands/tunnel.js";
 
 describe("Tunnel CLI Commands", () => {
-  it("registers tunnel command and its alias tun", () => {
+  it("registers tunnel command", () => {
     const program = new Command();
     registerTunnelCommands(program);
 
     const commandNames = program.commands.map((c) => c.name());
     expect(commandNames).toContain("tunnel");
-    expect(commandNames).toContain("tun");
   });
 
   it("registers all tunnel subcommands: list, get, update, connect, forward", () => {

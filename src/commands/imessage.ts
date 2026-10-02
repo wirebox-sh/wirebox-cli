@@ -140,18 +140,38 @@ export function registerIMessageCommands(program: Command): void {
       })
     );
 
-  // 4. wirebox imessage messages <conversation_id>
+  // 4. wirebox imessage read <conversation_id>
+  imessage
+    .command("read <conversation_id>")
+    .description("Mark every message in an iMessage conversation as read and reset unread count")
+    .action(
+      withErrorHandler(async function (this: Command, conversationId: string) {
+        const opts = getGlobalOpts(this);
+        const client = createClient(opts);
+
+        const res = await (client.imessage.conversations as any).read(conversationId);
+
+        if (opts.json) {
+          output(res, { json: true });
+        } else {
+          console.log(`Conversation '${conversationId}' marked as read (unread count: ${res.unread_count}).`);
+        }
+      })
+    );
+
+  // 5. wirebox imessage messages <conversation_id>
   imessage
     .command("messages <conversation_id>")
     .description("Show message history in an iMessage conversation")
     .option("--limit <n>", "Max messages to retrieve", (v) => parseInt(v, 10))
     .option("--cursor <cursor>", "Cursor for pagination")
+    .option("--no-mark-read", "Leave unread count and message read markers untouched")
     .option("--raw", "Display table instead of chat visualizer", false)
     .action(
       withErrorHandler(async function (
         this: Command,
         conversationId: string,
-        cmdOpts: { limit?: number; cursor?: string; raw?: boolean }
+        cmdOpts: { limit?: number; cursor?: string; raw?: boolean; markRead?: boolean }
       ) {
         const opts = getGlobalOpts(this);
         const client = createClient(opts);
@@ -160,7 +180,8 @@ export function registerIMessageCommands(program: Command): void {
           conversation_id: conversationId,
           limit: cmdOpts.limit,
           cursor: cmdOpts.cursor,
-        });
+          mark_read: cmdOpts.markRead,
+        } as any);
 
         if (opts.json) {
           output(res, { json: true });

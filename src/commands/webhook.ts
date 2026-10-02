@@ -390,14 +390,4 @@ export function registerWebhookCommands(program: Command): void {
     .command("webhook")
     .description("Manage real-time webhook subscriptions and signature verification");
   attachWebhookSubcommands(webhookCmd);
-
-  const webhooksCmd = program
-    .command("webhooks")
-    .description("Alias for 'webhook'");
-  attachWebhookSubcommands(webhooksCmd);
-
-  const whkCmd = program
-    .command("whk")
-    .description("Alias for 'webhook'");
-  attachWebhookSubcommands(whkCmd);
 }

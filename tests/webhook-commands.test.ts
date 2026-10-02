@@ -3,14 +3,12 @@ import { Command } from "commander";
 import { registerWebhookCommands } from "../src/commands/webhook.js";
 
 describe("Webhook CLI Commands", () => {
-  it("registers webhook command and its aliases webhooks and whk", () => {
+  it("registers webhook command", () => {
     const program = new Command();
     registerWebhookCommands(program);
 
     const commandNames = program.commands.map((c) => c.name());
     expect(commandNames).toContain("webhook");
-    expect(commandNames).toContain("webhooks");
-    expect(commandNames).toContain("whk");
   });
 
   it("registers all webhook subcommands: list, get, create, update, delete, test, rotate-secret, verify", () => {
