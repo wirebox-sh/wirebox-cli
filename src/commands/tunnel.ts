@@ -224,9 +224,4 @@ export function registerTunnelCommands(program: Command): void {
     .command("tunnel")
     .description("Manage agent network tunnels and expose local services to the public internet");
   attachTunnelSubcommands(tunnelCmd);
-
-  const tunCmd = program
-    .command("tun")
-    .description("Alias for 'tunnel'");
-  attachTunnelSubcommands(tunCmd);
 }

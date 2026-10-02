@@ -18,6 +18,7 @@ describe("iMessage CLI Commands", () => {
     expect(subNames).toContain("router");
     expect(subNames).toContain("conversations");
     expect(subNames).toContain("disconnect");
+    expect(subNames).toContain("read");
     expect(subNames).toContain("messages");
     expect(subNames).toContain("send");
     expect(subNames).not.toContain("users");
@@ -247,5 +248,38 @@ describe("iMessage CLI Commands", () => {
     expect(loggedOutput).toContain("Hello, agent!");
     expect(loggedOutput).toContain("🤖 Agent:");
     expect(loggedOutput).toContain("Hello! How can I help you?");
+  });
+
+  it("read command marks conversation as read", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ id: "conv_01j999888777", unread_count: 0 }),
+    } as Response);
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = new Command()
+      .option("--api-key <key>")
+      .option("--json", "", false);
+    registerIMessageCommands(program);
+
+    await program.parseAsync([
+      "node",
+      "wirebox",
+      "--api-key",
+      "wb_live_test",
+      "imessage",
+      "read",
+      "conv_01j999888777",
+    ]);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/v1/imessage/conversations/conv_01j999888777/read"),
+      expect.objectContaining({ method: "POST" })
+    );
+    const loggedOutput = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(loggedOutput).toContain("marked as read");
   });
 });

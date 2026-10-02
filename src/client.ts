@@ -5,7 +5,7 @@
 import { Wirebox } from "@wirebox-sh/sdk";
 import type { Command } from "commander";
 
-export const CLI_VERSION = "0.5.0";
+export const CLI_VERSION = "0.6.0";
 
 export interface GlobalOpts {
   apiKey?: string;
