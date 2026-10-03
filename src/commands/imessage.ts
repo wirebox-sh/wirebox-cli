@@ -27,6 +27,25 @@ const MESSAGE_COLUMNS = [
   "created_at",
 ];
 
+function formatRelativeTime(isoString?: string | null): string {
+  if (!isoString) return "-";
+  try {
+    const diffMs = Date.now() - new Date(isoString).getTime();
+    if (isNaN(diffMs) || diffMs < 0) return isoString.slice(0, 16).replace("T", " ");
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 30) return `${diffDays}d ago`;
+    return isoString.slice(0, 10);
+  } catch {
+    return isoString;
+  }
+}
+
 export function registerIMessageCommands(program: Command): void {
   const imessage = program
     .command("imessage")
@@ -78,10 +97,17 @@ export function registerIMessageCommands(program: Command): void {
     .option("--status <status>", "Filter by status: connected or disconnected")
     .option("--limit <n>", "Max conversations to return (default: 20)", (v) => parseInt(v, 10))
     .option("--cursor <cursor>", "Cursor for pagination")
+    .option("--raw", "Display table instead of conversation card view", false)
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity?: string; status?: "connected" | "disconnected"; limit?: number; cursor?: string }
+        cmdOpts: {
+          identity?: string;
+          status?: "connected" | "disconnected";
+          limit?: number;
+          cursor?: string;
+          raw?: boolean;
+        }
       ) {
         const opts = getGlobalOpts(this);
         const client = createClient(opts);
@@ -104,19 +130,43 @@ export function registerIMessageCommands(program: Command): void {
           return;
         }
 
-        const rows = res.data.map((c) => ({
-          id: c.id,
-          identity_id: c.identity_id,
-          user_phone: c.user_phone,
-          status: c.status,
-          unread_count: c.unread_count,
-          last_message: c.last_message?.text || (c.last_message?.has_media ? "[Media]" : "-"),
-          updated_at: c.updated_at,
-        }));
+        if (cmdOpts.raw) {
+          const rows = res.data.map((c) => ({
+            id: c.id,
+            user_phone: c.user_phone,
+            status: c.status,
+            unread_count: c.unread_count,
+            last_message: c.last_message?.text || (c.last_message?.has_media ? "[Media]" : "-"),
+            updated_at: c.updated_at,
+          }));
+          output(rows, { columns: ["id", "user_phone", "status", "unread_count", "last_message", "updated_at"] });
+          return;
+        }
 
-        output(rows, { columns: CONVERSATION_COLUMNS });
+        if (res.data.length === 0) {
+          console.log("No iMessage conversations found.");
+          return;
+        }
+
+        console.log(`\nActive iMessage Conversations (${res.data.length}):\n`);
+        for (const c of res.data) {
+          const statusBullet = c.status === "connected" ? "●" : "○";
+          const statusTag = `[${c.status}]`;
+          const unreadTag = c.unread_count > 0 ? ` (${c.unread_count} unread)` : "";
+          const timeTag = formatRelativeTime(c.updated_at);
+          const preview = c.last_message?.text
+            ? `"${c.last_message.text}"`
+            : c.last_message?.has_media
+            ? "[Media attachment]"
+            : "(no messages yet)";
+
+          console.log(`${statusBullet} ${c.user_phone}  ${statusTag}${unreadTag}  ·  ${timeTag}`);
+          console.log(`  ID:   ${c.id}`);
+          console.log(`  Last: ${preview}\n`);
+        }
+
         if (res.has_more && res.next_cursor) {
-          console.log(`\nNext cursor: ${res.next_cursor}`);
+          console.log(`Next cursor: ${res.next_cursor}\n`);
         }
       })
     );
