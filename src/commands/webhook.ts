@@ -11,16 +11,7 @@ import type { CreateWebhookParams, UpdateWebhookParams, WebhookStatus } from "@w
 import type { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { withErrorHandler } from "../errors.js";
-import { output } from "../output.js";
-
-const WEBHOOK_COLUMNS = [
-  "id",
-  "agent_handle",
-  "url",
-  "events",
-  "status",
-  "created_at",
-];
+import { output, formatRelativeTime } from "../output.js";
 
 async function readStdin(): Promise<string> {
   return new Promise((resolve) => {
@@ -73,16 +64,31 @@ export function registerWebhookCommands(program: Command): void {
             return;
           }
 
-          const rows = webhooks.map((w) => ({
-            id: w.id,
-            agent_handle: w.agent_handle || "-",
-            url: w.url,
-            events: Array.isArray(w.events) ? w.events.join(", ") : String(w.events),
-            status: w.status,
-            created_at: w.created_at ? w.created_at.slice(0, 19).replace("T", " ") : "-",
-          }));
+          if (webhooks.length === 0) {
+            console.log("No webhooks configured.");
+            return;
+          }
 
-          output(rows, { columns: WEBHOOK_COLUMNS });
+          console.log();
+          for (const w of webhooks) {
+            const status = (w.status || "active").toLowerCase();
+            const statusUpper = status.toUpperCase();
+            const statusBullet = status === "active" ? "●" : "○";
+            const agentTag = w.agent_handle ? ` (@${w.agent_handle.replace(/^@/, "")})` : "";
+            const eventsStr = Array.isArray(w.events)
+              ? (w.events.length === 1 && w.events[0] === "*" ? "* (all events)" : w.events.join(", "))
+              : String(w.events);
+            const created = formatRelativeTime(w.created_at);
+
+            console.log(`  ${statusBullet} ${statusUpper.padEnd(7)}  ${w.id}${agentTag}`);
+            console.log(`    URL:     ${w.url}`);
+            console.log(`    Events:  ${eventsStr}`);
+            console.log(`    Created: ${created}`);
+            console.log();
+          }
+
+          const countStr = webhooks.length === 1 ? "1 webhook" : `${webhooks.length} webhooks`;
+          console.log(`${countStr} configured. Run 'wirebox webhook test <id>' to ping an endpoint.\n`);
         })
       );
 
@@ -95,20 +101,41 @@ export function registerWebhookCommands(program: Command): void {
           const client = createClient(opts);
           const webhook = await client.webhooks.get(id);
 
-          output(
-            {
-              id: webhook.id,
-              agent_handle: webhook.agent_handle || "-",
-              mailbox_address: webhook.mailbox_address || "-",
-              url: webhook.url,
-              events: webhook.events,
-              status: webhook.status,
-              auth_token: webhook.has_auth_token ? "********" : "-",
-              created_at: webhook.created_at,
-              updated_at: webhook.updated_at,
-            },
-            { json: !!opts.json }
-          );
+          if (opts.json) {
+            output(webhook, { json: true });
+            return;
+          }
+
+          const status = (webhook.status || "active").toLowerCase();
+          const statusUpper = status.toUpperCase();
+          const statusBullet = status === "active" ? "●" : "○";
+          const eventsStr = Array.isArray(webhook.events)
+            ? (webhook.events.length === 1 && webhook.events[0] === "*" ? "* (all events)" : webhook.events.join(", "))
+            : String(webhook.events);
+          const agentDisplay = webhook.agent_handle
+            ? `@${webhook.agent_handle.replace(/^@/, "")}`
+            : "-";
+
+          console.log();
+          console.log(`  ${statusBullet} Webhook Endpoint Details`);
+          console.log(`  ID:              ${webhook.id}`);
+          console.log(`  Status:          ${statusUpper}`);
+          console.log(`  Agent Handle:    ${agentDisplay}`);
+          if (webhook.mailbox_address) {
+            console.log(`  Mailbox:         ${webhook.mailbox_address}`);
+          }
+          console.log(`  Destination URL: ${webhook.url}`);
+          console.log(`  Events:          ${eventsStr}`);
+          console.log(`  Auth Token:      ${webhook.has_auth_token ? "Bearer configured (hidden)" : "None"}`);
+          console.log(`  Created:         ${formatRelativeTime(webhook.created_at)} (${webhook.created_at ? webhook.created_at.slice(0, 19).replace("T", " ") : "-"})`);
+          if (webhook.updated_at && webhook.updated_at !== webhook.created_at) {
+            console.log(`  Updated:         ${formatRelativeTime(webhook.updated_at)} (${webhook.updated_at.slice(0, 19).replace("T", " ")})`);
+          }
+          console.log();
+          console.log(`💡 Next steps:`);
+          console.log(`  - Test receiver connectivity:  wirebox webhook test ${webhook.id}`);
+          console.log(`  - Rotate signing secret:       wirebox webhook rotate-secret ${webhook.id}`);
+          console.log();
         })
       );
 
@@ -217,17 +244,25 @@ export function registerWebhookCommands(program: Command): void {
 
           const updated = await client.webhooks.update(id, updateParams);
 
-          output(
-            {
-              id: updated.id,
-              agent_handle: updated.agent_handle || "-",
-              url: updated.url,
-              events: updated.events,
-              status: updated.status,
-              updated_at: updated.updated_at,
-            },
-            { json: !!opts.json }
-          );
+          if (opts.json) {
+            output(updated, { json: true });
+            return;
+          }
+
+          const eventsStr = Array.isArray(updated.events)
+            ? (updated.events.length === 1 && updated.events[0] === "*" ? "* (all events)" : updated.events.join(", "))
+            : String(updated.events);
+
+          console.log(`\nWebhook '${updated.id}' updated successfully:\n`);
+          output({
+            id: updated.id,
+            status: updated.status?.toUpperCase() || "ACTIVE",
+            agent_handle: updated.agent_handle ? `@${updated.agent_handle.replace(/^@/, "")}` : "-",
+            url: updated.url,
+            events: eventsStr,
+            updated_at: `${formatRelativeTime(updated.updated_at)} (${updated.updated_at ? updated.updated_at.slice(0, 19).replace("T", " ") : "-"})`,
+          });
+          console.log();
         })
       );
 

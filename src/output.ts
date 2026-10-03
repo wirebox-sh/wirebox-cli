@@ -12,6 +12,25 @@ function formatValue(v: unknown): string {
   return String(v);
 }
 
+export function formatRelativeTime(isoString?: string | null): string {
+  if (!isoString) return "-";
+  try {
+    const diffMs = Date.now() - new Date(isoString).getTime();
+    if (isNaN(diffMs) || diffMs < 0) return isoString.slice(0, 16).replace("T", " ");
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 30) return `${diffDays}d ago`;
+    return isoString.slice(0, 10);
+  } catch {
+    return isoString;
+  }
+}
+
 export function printTable(
   rows: Record<string, unknown>[],
   columns?: string[]
