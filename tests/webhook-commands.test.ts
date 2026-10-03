@@ -27,6 +27,7 @@ describe("Webhook CLI Commands", () => {
     expect(subNames).toContain("test");
     expect(subNames).toContain("rotate-secret");
     expect(subNames).toContain("verify-signature");
+    expect(subNames).toContain("listen");
   });
 
   it("registers view aliases (info, show) and ping alias for test without legacy get/verify", () => {
@@ -86,4 +87,20 @@ describe("Webhook CLI Commands", () => {
     expect(verifyOptNames).toContain("timestamp");
     expect(verifyOptNames).toContain("tolerance");
   });
+
+  it("registers appropriate options for webhook listen", () => {
+    const program = new Command();
+    registerWebhookCommands(program);
+
+    const webhookCmd = program.commands.find((c) => c.name() === "webhook");
+    const listenCmd = webhookCmd!.commands.find((c) => c.name() === "listen");
+    expect(listenCmd).toBeDefined();
+
+    const listenOptNames = listenCmd!.options.map((o) => o.name());
+    expect(listenOptNames).toContain("agent");
+    expect(listenOptNames).toContain("forward-to");
+    expect(listenOptNames).toContain("events");
+    expect(listenOptNames).toContain("print-secret");
+  });
 });
+

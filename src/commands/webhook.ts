@@ -421,6 +421,186 @@ export function registerWebhookCommands(program: Command): void {
           }
         })
       );
+
+    parent
+      .command("listen")
+      .description("Listen to live webhook events in real-time without running a local server")
+      .option("-a, --agent <handle>", "Agent handle to listen for (defaults to scoped identity)")
+      .option("-f, --forward-to <url>", "Optionally forward incoming events to a local service (e.g. http://localhost:3000)")
+      .option("-e, --events <events>", "Comma-separated events to subscribe (default: *)", "*")
+      .option("--print-secret", "Display the webhook signing secret for verification testing")
+      .action(
+        withErrorHandler(async function (
+          this: Command,
+          cmdOpts: {
+            agent?: string;
+            forwardTo?: string;
+            events?: string;
+            printSecret?: boolean;
+          }
+        ) {
+          const opts = getGlobalOpts(this);
+          const client = createClient(opts);
+
+          let agentHandle = cmdOpts.agent;
+          if (!agentHandle) {
+            const currentIdentity = await client.getIdentity();
+            agentHandle = currentIdentity.agent_handle;
+          }
+          agentHandle = agentHandle.replace(/^@/, "");
+
+          const targetEndpoint = `https://${agentHandle}.wirebox.run/webhook`;
+
+          // Check if an existing webhook subscription points to this endpoint
+          const existing = await client.webhooks.list({ agent: agentHandle });
+          let webhook = existing.find((w) => w.url === targetEndpoint);
+          let ephemeralCreated = false;
+
+          if (!webhook) {
+            const eventList = (cmdOpts.events || "*")
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+            webhook = await client.webhooks.create({
+              url: targetEndpoint,
+              events: eventList,
+              agent: agentHandle,
+            });
+            ephemeralCreated = true;
+          }
+
+          const forwardUrl = cmdOpts.forwardTo;
+
+          // Connect in-memory reverse proxy tunnel
+          const session = await client.tunnels.connect(agentHandle, {
+            handler: async (request: Request) => {
+              const rawBody = await request.text();
+              const now = new Date();
+              const timeStr = now.toTimeString().slice(0, 8);
+
+              let payload: any = null;
+              try {
+                payload = JSON.parse(rawBody);
+              } catch {
+                payload = rawBody;
+              }
+
+              if (opts.json) {
+                console.log(
+                  JSON.stringify({
+                    timestamp: now.toISOString(),
+                    path: new URL(request.url).pathname,
+                    payload,
+                  })
+                );
+              } else {
+                const eventType = payload?.event_type || payload?.type || "http.request";
+                let icon = "📬";
+                if (eventType === "test.ping") icon = "🏓";
+                else if (eventType === "email.sent") icon = "📤";
+                else if (eventType.startsWith("email.")) icon = "✉️ ";
+                else if (eventType.startsWith("imessage.")) icon = "💬";
+                else if (eventType.startsWith("sms.")) icon = "📱";
+
+                console.log(`\n[${timeStr}] ${icon}  Event: ${eventType}  -->  200 OK`);
+
+                if (payload?.id) {
+                  console.log(`  Event ID:    ${payload.id}`);
+                }
+
+                if (payload?.data) {
+                  const d = payload.data;
+                  if (d.message) {
+                    const m = d.message;
+                    if (m.from) console.log(`  From:        ${m.from}`);
+                    if (m.to) {
+                      console.log(`  To:          ${Array.isArray(m.to) ? m.to.join(", ") : m.to}`);
+                    }
+                    if (m.subject) console.log(`  Subject:     ${m.subject}`);
+                    if (m.snippet) console.log(`  Snippet:     ${m.snippet.slice(0, 100)}`);
+                    if (m.text) console.log(`  Text:        ${m.text.slice(0, 100)}`);
+                    if (m.id) console.log(`  Message ID:  ${m.id}`);
+                  } else if (d.delivery) {
+                    console.log(`  Recipient:   ${d.delivery.recipient || "-"}`);
+                    console.log(`  SMTP Status: ${d.delivery.smtp_response || "-"}`);
+                  } else if (d.bounce) {
+                    console.log(`  Recipient:   ${d.bounce.recipient || "-"}`);
+                    console.log(`  Reason:      ${d.bounce.reason || "-"}`);
+                  }
+                } else if (payload?.message) {
+                  console.log(`  Message:     ${payload.message}`);
+                }
+              }
+
+              if (forwardUrl) {
+                try {
+                  const headers: Record<string, string> = {};
+                  request.headers.forEach((v, k) => {
+                    headers[k] = v;
+                  });
+                  const fwdRes = await fetch(forwardUrl, {
+                    method: request.method,
+                    headers,
+                    body: rawBody,
+                  });
+                  const fwdBuffer = await fwdRes.arrayBuffer();
+                  return new Response(fwdBuffer, {
+                    status: fwdRes.status,
+                    headers: fwdRes.headers,
+                  });
+                } catch (err: any) {
+                  console.error(`  ⚠️ Forwarding to ${forwardUrl} failed: ${err.message}`);
+                  return new Response(
+                    JSON.stringify({ error: "forward_failed", message: err.message }),
+                    {
+                      status: 502,
+                      headers: { "content-type": "application/json" },
+                    }
+                  );
+                }
+              }
+
+              return new Response(JSON.stringify({ received: true }), {
+                status: 200,
+                headers: { "content-type": "application/json" },
+              });
+            },
+          });
+
+          // Print startup banner
+          console.log("\n========================================================");
+          console.log("  Wirebox Webhook Live Inspector");
+          console.log(`  Agent Handle:   @${agentHandle}`);
+          console.log(`  Endpoint URL:   ${targetEndpoint}`);
+          console.log(`  Subscribed:     ${Array.isArray(webhook.events) ? webhook.events.join(", ") : webhook.events}`);
+          if (cmdOpts.printSecret && (webhook as any).secret) {
+            console.log(`  Signing Secret: ${(webhook as any).secret}`);
+          }
+          console.log(`  Forwarding:     ${forwardUrl || "None (In-memory Inspector)"}`);
+          console.log("========================================================\n");
+          console.log("Ready! Waiting for live webhook events (Press Ctrl+C to quit)...");
+
+          // Clean exit handler
+          let cleanedUp = false;
+          const cleanup = async () => {
+            if (cleanedUp) return;
+            cleanedUp = true;
+            console.log("\nClosing webhook live inspector...");
+            await session.close().catch(() => {});
+            if (ephemeralCreated && webhook?.id) {
+              console.log(`Removing ephemeral webhook subscription '${webhook.id}'...`);
+              await client.webhooks.delete(webhook.id).catch(() => {});
+            }
+            process.exit(0);
+          };
+
+          process.on("SIGINT", cleanup);
+          process.on("SIGTERM", cleanup);
+
+          await session.waitClosed();
+        })
+      );
   }
 
   const webhookCmd = program
