@@ -78,6 +78,17 @@ export function withErrorHandler<T extends unknown[]>(
     } catch (err) {
       if (wantsJson(this)) {
         renderJsonError(err);
+      } else if (err instanceof AuthenticationError && err.code === "missing_api_key") {
+        console.error("Error: No API key found.\n");
+        console.error("To authenticate, provide a key using one of the following methods:\n");
+        console.error("  1. Save your API key to local configuration (recommended):");
+        console.error("     mkdir -p ~/.wirebox && echo \"api_key=wb_live_...\" > ~/.wirebox/config");
+        console.error("     chmod 600 ~/.wirebox/config\n");
+        console.error("  2. Set the environment variable in your shell:");
+        console.error("     export WIREBOX_API_KEY=\"wb_live_...\"\n");
+        console.error("  3. Pass it as a flag to any command:");
+        console.error("     wirebox <command> --api-key \"wb_live_...\"\n");
+        console.error("Don't have an API key yet? Run 'wirebox signup' to create an agent identity.");
       } else if (err instanceof AuthenticationError) {
         console.error(`Error: HTTP ${err.status} [${err.code}]: ${err.message}`);
         console.error("Hint: Set WIREBOX_API_KEY, pass --api-key, or run 'wirebox signup'.");
@@ -92,6 +103,11 @@ export function withErrorHandler<T extends unknown[]>(
         if (err.retryAfterSeconds) {
           console.error(`Hint: Please retry after ${err.retryAfterSeconds} seconds.`);
         }
+      } else if (err instanceof WireboxAPIError && err.code === "imessage_disabled") {
+        console.error(`Error: HTTP ${err.status} [${err.code}]: ${err.message}`);
+        console.error("Hint: Enable iMessage for this agent using one of the following:");
+        console.error("  - CLI:     wirebox identity update <handle> --enable-imessage");
+        console.error("  - Console: https://wirebox.sh/console/workspace (select agent -> iMessage -> Enable iMessage)");
       } else if (err instanceof WireboxAPIError) {
         console.error(`Error: HTTP ${err.status} [${err.code}]: ${err.message}`);
       } else if (err instanceof WireboxConnectionError) {

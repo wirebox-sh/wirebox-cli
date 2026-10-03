@@ -25,6 +25,26 @@ describe("CLI withErrorHandler", () => {
     exitSpy.mockRestore();
   });
 
+  it("catches AuthenticationError with missing_api_key and prints detailed 1/2/3 setup guide", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as any);
+
+    const failingAction = withErrorHandler(async () => {
+      throw new AuthenticationError(401, "missing_api_key", "API key is required");
+    });
+
+    await failingAction();
+
+    expect(errorSpy).toHaveBeenCalledWith("Error: No API key found.\n");
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("mkdir -p ~/.wirebox && echo \"api_key=wb_live_...\" > ~/.wirebox/config")
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    errorSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
   it("catches HandleAlreadyTakenError and prints hint", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as any);

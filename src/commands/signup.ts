@@ -4,7 +4,7 @@
 
 import { Wirebox } from "@wirebox-sh/sdk";
 import type { Command } from "commander";
-import { getGlobalOpts } from "../client.js";
+import { getGlobalOpts, readConfigFile } from "../client.js";
 import { withErrorHandler } from "../errors.js";
 import { output } from "../output.js";
 
@@ -69,13 +69,15 @@ export function registerSignupCommands(program: Command): void {
         cmdOpts: { code: string; apiKey?: string }
       ) {
         const globalOpts = getGlobalOpts(this);
+        const fileCfg = readConfigFile();
         const apiKey =
           cmdOpts.apiKey ||
           globalOpts.apiKey ||
-          (typeof process !== "undefined" && process?.env?.WIREBOX_API_KEY);
+          (typeof process !== "undefined" && process?.env?.WIREBOX_API_KEY) ||
+          fileCfg.apiKey;
 
         if (!apiKey) {
-          console.error("Error: API key is required. Pass --api-key or set WIREBOX_API_KEY.");
+          console.error("Error: API key is required. Pass --api-key, set WIREBOX_API_KEY, or configure ~/.wirebox/config.");
           process.exit(1);
         }
 
@@ -93,6 +95,18 @@ export function registerSignupCommands(program: Command): void {
         console.log();
         console.log("✅ Verification successful!");
         console.log("Your agent identity is now claimed and full outbound sending limits are unlocked.");
+        console.log();
+        console.log("💡 Next steps to authenticate your environment:");
+        console.log();
+        console.log("  1. Save your API key to local configuration (recommended):");
+        console.log(`     mkdir -p ~/.wirebox && echo "api_key=${apiKey}" > ~/.wirebox/config`);
+        console.log("     chmod 600 ~/.wirebox/config");
+        console.log();
+        console.log("  2. Or export it in your current terminal session:");
+        console.log(`     export WIREBOX_API_KEY="${apiKey}"`);
+        console.log();
+        console.log("Then verify your setup anytime with:");
+        console.log("  wirebox whoami");
         console.log();
       })
     );

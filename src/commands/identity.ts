@@ -12,6 +12,7 @@ const IDENTITY_COLUMNS = [
   "display_name",
   "email_address",
   "public_url",
+  "imessage",
   "status",
   "created_at",
 ];
@@ -24,10 +25,16 @@ export function registerIdentityCommands(program: Command): void {
       .requiredOption("--handle <handle>", "Globally unique agent handle (e.g. sales-bot)")
       .option("--display-name <name>", "Human-friendly display name")
       .option("--description <desc>", "Agent role or description")
+      .option("--enable-imessage", "Enable Apple iMessage router communication channel")
       .action(
         withErrorHandler(async function (
           this: Command,
-          cmdOpts: { handle: string; displayName?: string; description?: string }
+          cmdOpts: {
+            handle: string;
+            displayName?: string;
+            description?: string;
+            enableImessage?: boolean;
+          }
         ) {
           const opts = getGlobalOpts(this);
           const client = createClient(opts);
@@ -35,6 +42,7 @@ export function registerIdentityCommands(program: Command): void {
             agent_handle: cmdOpts.handle,
             display_name: cmdOpts.displayName,
             description: cmdOpts.description,
+            imessage_enabled: cmdOpts.enableImessage,
           });
 
           output(
@@ -44,6 +52,7 @@ export function registerIdentityCommands(program: Command): void {
               display_name: agent.display_name,
               email_address: agent.mailbox.email_address,
               public_url: agent.tunnel.public_url,
+              imessage: agent.imessage_enabled ? "enabled" : "disabled",
               status: agent.status,
               created_at: agent.created_at,
             },
@@ -81,6 +90,7 @@ export function registerIdentityCommands(program: Command): void {
             display_name: item.display_name,
             email_address: item.mailbox.email_address,
             public_url: item.tunnel?.public_url || "-",
+            imessage: item.imessage_enabled ? "enabled" : "disabled",
             status: item.status,
             created_at: item.created_at.slice(0, 19).replace("T", " "),
           }));
@@ -108,6 +118,7 @@ export function registerIdentityCommands(program: Command): void {
               mailbox_id: agent.mailbox.id || "-",
               public_url: agent.tunnel?.public_url || "-",
               tunnel_status: agent.tunnel?.status || "-",
+              imessage: agent.imessage_enabled ? "enabled" : "disabled",
               status: agent.status,
               created_at: agent.created_at,
               updated_at: agent.updated_at,
@@ -119,21 +130,37 @@ export function registerIdentityCommands(program: Command): void {
 
     parent
       .command("update <handle>")
-      .description("Update an existing agent identity's profile")
+      .description("Update an existing agent identity's profile and communication channels")
       .option("--display-name <name>", "New display name")
       .option("--description <desc>", "New description")
+      .option("--enable-imessage", "Enable Apple iMessage router communication channel")
+      .option("--disable-imessage", "Disable Apple iMessage router communication channel")
       .action(
         withErrorHandler(async function (
           this: Command,
           handle: string,
-          cmdOpts: { displayName?: string; description?: string }
+          cmdOpts: {
+            displayName?: string;
+            description?: string;
+            enableImessage?: boolean;
+            disableImessage?: boolean;
+          }
         ) {
           const opts = getGlobalOpts(this);
           const client = createClient(opts);
           const agent = await client.getIdentity(handle);
+
+          let imessageEnabled: boolean | undefined = undefined;
+          if (cmdOpts.enableImessage) {
+            imessageEnabled = true;
+          } else if (cmdOpts.disableImessage) {
+            imessageEnabled = false;
+          }
+
           const updated = await agent.update({
             display_name: cmdOpts.displayName,
             description: cmdOpts.description,
+            imessage_enabled: imessageEnabled,
           });
 
           output(
@@ -141,6 +168,7 @@ export function registerIdentityCommands(program: Command): void {
               agent_handle: updated.agent_handle,
               display_name: updated.display_name,
               description: updated.description || "-",
+              imessage: updated.imessage_enabled ? "enabled" : "disabled",
               status: updated.status,
               updated_at: updated.updated_at,
             },

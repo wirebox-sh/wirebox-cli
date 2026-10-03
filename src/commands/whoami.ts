@@ -13,24 +13,60 @@ export function registerWhoamiCommand(program: Command): void {
     const client = createClient(opts);
     const info = await client.whoami();
 
+    // If the caller is scoped to a specific agent, resolve its full profile (handle, email, tunnel)
+    let scopedAgent: any = null;
+    if (info.auth.scoped_identity_id) {
+      try {
+        scopedAgent = await client.getIdentity();
+      } catch {
+        // Fallback if identity lookup fails
+      }
+    }
+
     if (opts.json) {
-      output(info, { json: true });
+      output(
+        {
+          ...info,
+          identity: scopedAgent
+            ? {
+                id: scopedAgent.id,
+                handle: scopedAgent.agent_handle,
+                display_name: scopedAgent.display_name,
+                email_address: scopedAgent.mailbox?.email_address || null,
+                public_url: scopedAgent.tunnel?.public_url || null,
+                tunnel_status: scopedAgent.tunnel?.status || null,
+                imessage_enabled: scopedAgent.imessage_enabled ?? false,
+              }
+            : null,
+        },
+        { json: true }
+      );
       return;
     }
 
-    output({
-      "Organization ID": info.organization.id,
-      "Organization Name": info.organization.name,
-      "Slug": info.organization.slug,
-      "Billing Plan": info.organization.billing_plan,
-      "Claim Status": info.organization.is_claimed ? "Verified (Claimed)" : "Unclaimed (Sandbox)",
-      "Supervisor Email": info.organization.claimed_by_email || "-",
-      "Auth Type": info.auth.type,
-      "Actor ID": info.auth.actor_id,
-      "Scoped Identity": info.auth.scoped_identity_id || "(Admin / All Identities)",
-      "Active Agents": `${info.usage.agents_count} / ${info.usage.agents_limit}`,
-      "Active Webhooks": `${info.usage.webhooks_count} / ${info.usage.webhooks_limit}`,
-    });
+    const record: Record<string, string> = {};
+
+    if (scopedAgent) {
+      record["Agent Handle"] = `@${scopedAgent.agent_handle}`;
+      record["Display Name"] = scopedAgent.display_name;
+      record["Email Address"] = scopedAgent.mailbox?.email_address || "-";
+      record["Public Tunnel"] = scopedAgent.tunnel?.public_url
+        ? `${scopedAgent.tunnel.public_url} (${scopedAgent.tunnel.status})`
+        : "-";
+      record["iMessage Channel"] = scopedAgent.imessage_enabled ? "Enabled" : "Disabled";
+    } else {
+      record["Role"] = "Admin (All Identities)";
+    }
+
+    record["Organization ID"] = info.organization.id;
+    record["Organization Name"] = info.organization.name;
+    record["Billing Plan"] = info.organization.billing_plan;
+    record["Claim Status"] = info.organization.is_claimed ? "Verified (Claimed)" : "Unclaimed (Sandbox)";
+    record["Supervisor Email"] = info.organization.claimed_by_email || "-";
+    record["Active Agents"] = `${info.usage.agents_count} / ${info.usage.agents_limit}`;
+    record["Active Webhooks"] = `${info.usage.webhooks_count} / ${info.usage.webhooks_limit}`;
+
+    output(record);
   });
 
   program
