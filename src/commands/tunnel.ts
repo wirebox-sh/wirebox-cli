@@ -18,6 +18,36 @@ const TUNNEL_COLUMNS = [
   "last_request_at",
 ];
 
+function formatRelativeTime(isoString?: string | null): string {
+  if (!isoString) return "-";
+  try {
+    const diffMs = Date.now() - new Date(isoString).getTime();
+    if (isNaN(diffMs) || diffMs < 0) return isoString.slice(0, 16).replace("T", " ");
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 30) return `${diffDays}d ago`;
+    return isoString.slice(0, 10);
+  } catch {
+    return isoString;
+  }
+}
+
+function formatClockTime(isoString?: string | null): string {
+  if (!isoString) return "-";
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    return d.toTimeString().slice(0, 8);
+  } catch {
+    return isoString;
+  }
+}
+
 export function registerTunnelCommands(program: Command): void {
   function attachTunnelSubcommands(parent: Command) {
     parent
@@ -61,34 +91,61 @@ export function registerTunnelCommands(program: Command): void {
       );
 
     parent
-      .command("get <handle-or-id>")
-      .description("Get profile details and live telemetry for an agent's network tunnel")
+      .command("status [handle-or-id]")
+      .aliases(["info", "get", "view"])
+      .description("Get live status, public endpoint, and telemetry for an agent's network tunnel")
       .action(
-        withErrorHandler(async function (this: Command, handleOrId: string) {
+        withErrorHandler(async function (this: Command, handleOrId?: string) {
           const opts = getGlobalOpts(this);
           const client = createClient(opts);
-          const tunnel = await client.tunnels.get(handleOrId);
 
-          output(
-            {
-              id: tunnel.id,
-              agent_handle: tunnel.agent_handle,
-              public_url: tunnel.public_url,
-              public_host: tunnel.public_host,
-              status: tunnel.status,
-              is_connected: tunnel.is_connected ? "yes" : "no",
-              connected_clients: tunnel.connected_clients,
-              connected_at: tunnel.connected_at || "-",
-              disconnected_at: tunnel.disconnected_at || "-",
-              client_ip: tunnel.client?.ip || "-",
-              client_version: tunnel.client?.version || "-",
-              client_forward_to: tunnel.client?.forward_to || "-",
-              last_request_at: tunnel.last_request_at || "-",
-              created_at: tunnel.created_at,
-              updated_at: tunnel.updated_at,
-            },
-            { json: !!opts.json }
-          );
+          let target = handleOrId;
+          if (!target) {
+            const agent = await client.getIdentity();
+            target = agent.agent_handle;
+          }
+
+          const tunnel = await client.tunnels.get(target);
+
+          if (opts.json) {
+            output(tunnel, { json: true });
+            return;
+          }
+
+          const record: Record<string, string> = {
+            "Agent Handle": `@${tunnel.agent_handle}`,
+            "Public URL": tunnel.public_url,
+          };
+
+          if (tunnel.status === "disabled") {
+            record["Tunnel Status"] = "Disabled (Administratively disabled)";
+          } else if (tunnel.is_connected) {
+            const clientCount = tunnel.connected_clients || 1;
+            record["Tunnel Status"] = `Active (Connected · ${clientCount} client${clientCount > 1 ? "s" : ""})`;
+            record["Forwarding To"] = tunnel.client?.forward_to || "-";
+            if (tunnel.client?.ip) {
+              record["Client IP"] = tunnel.client.version
+                ? `${tunnel.client.ip} (${tunnel.client.version})`
+                : tunnel.client.ip;
+            }
+            if (tunnel.connected_at) {
+              record["Connected Since"] = `${formatRelativeTime(tunnel.connected_at)} (${formatClockTime(tunnel.connected_at)})`;
+            }
+            if (tunnel.last_request_at) {
+              record["Last Request"] = `${formatRelativeTime(tunnel.last_request_at)} (${formatClockTime(tunnel.last_request_at)})`;
+            }
+          } else {
+            record["Tunnel Status"] = "Active (Disconnected)";
+            if (tunnel.disconnected_at) {
+              record["Disconnected At"] = `${formatRelativeTime(tunnel.disconnected_at)} (${formatClockTime(tunnel.disconnected_at)})`;
+            }
+          }
+
+          output(record);
+
+          if (!tunnel.is_connected && tunnel.status !== "disabled") {
+            console.log(`\nHint: Expose a local service using 'wirebox tunnel connect ${tunnel.agent_handle} --port <port>'.`);
+          }
         })
       );
 
@@ -115,24 +172,30 @@ export function registerTunnelCommands(program: Command): void {
       );
 
     parent
-      .command("connect <handle-or-id>")
+      .command("connect [handle-or-id]")
       .description("Connect a local port or URL to the agent's public URL")
       .option("-p, --port <port>", "Local port number (e.g. 3000, 8000)")
       .option("-f, --forward-to <url>", "Local destination URL (e.g. http://localhost:8000)")
       .action(
         withErrorHandler(async function (
           this: Command,
-          handleOrId: string,
+          handleOrId: string | undefined,
           cmdOpts: { port?: string; forwardTo?: string }
         ) {
           const opts = getGlobalOpts(this);
           const client = createClient(opts);
 
+          let targetHandle = handleOrId;
+          if (!targetHandle) {
+            const agent = await client.getIdentity();
+            targetHandle = agent.agent_handle;
+          }
+
           const target = cmdOpts.port ? parseInt(cmdOpts.port, 10) : cmdOpts.forwardTo || "http://localhost:3000";
 
-          console.log(`Connecting tunnel for '${handleOrId}' to ${target}...`);
+          console.log(`Connecting tunnel for '${targetHandle}' to ${target}...`);
 
-          const session = await client.tunnels.connect(handleOrId, {
+          const session = await client.tunnels.connect(targetHandle, {
             forwardTo: target,
             clientVersion: `wirebox-cli/${CLI_VERSION}`,
             onStatusChange: (status) => {
@@ -171,17 +234,31 @@ export function registerTunnelCommands(program: Command): void {
       );
 
     parent
-      .command("forward <handle-or-id> [target]")
+      .command("forward [handle-or-id] [target]")
       .description("Convenience alias for 'connect' (e.g. wirebox tunnel forward @sales-bot 8000)")
       .action(
-        withErrorHandler(async function (this: Command, handleOrId: string, target?: string) {
+        withErrorHandler(async function (this: Command, handleOrId?: string, target?: string) {
           const opts = getGlobalOpts(this);
           const client = createClient(opts);
-          const dest = target || "http://localhost:3000";
 
-          console.log(`Connecting tunnel for '${handleOrId}' to ${dest}...`);
+          let targetHandle = handleOrId;
+          let dest = target;
 
-          const session = await client.tunnels.connect(handleOrId, {
+          // If the first argument is a port number like "3000" or URL like "http://...", treat it as target
+          if (handleOrId && (/^\d+$/.test(handleOrId) || handleOrId.startsWith("http"))) {
+            dest = handleOrId;
+            const agent = await client.getIdentity();
+            targetHandle = agent.agent_handle;
+          } else if (!targetHandle) {
+            const agent = await client.getIdentity();
+            targetHandle = agent.agent_handle;
+          }
+
+          dest = dest || "http://localhost:3000";
+
+          console.log(`Connecting tunnel for '${targetHandle}' to ${dest}...`);
+
+          const session = await client.tunnels.connect(targetHandle, {
             forwardTo: dest,
             clientVersion: `wirebox-cli/${CLI_VERSION}`,
             onStatusChange: (status) => {

@@ -11,18 +11,21 @@ describe("Tunnel CLI Commands", () => {
     expect(commandNames).toContain("tunnel");
   });
 
-  it("registers all tunnel subcommands: list, get, update, connect, forward", () => {
+  it("registers all tunnel subcommands and aliases: list, status (info, get, view), update, connect, forward", () => {
     const program = new Command();
     registerTunnelCommands(program);
 
     const tunnelCmd = program.commands.find((c) => c.name() === "tunnel");
     expect(tunnelCmd).toBeDefined();
 
-    const subNames = tunnelCmd!.commands.map((c) => c.name());
-    expect(subNames).toContain("list");
-    expect(subNames).toContain("get");
-    expect(subNames).toContain("update");
-    expect(subNames).toContain("connect");
-    expect(subNames).toContain("forward");
+    const allNames = tunnelCmd!.commands.flatMap((c) => [c.name(), ...c.aliases()]);
+    expect(allNames).toContain("list");
+    expect(allNames).toContain("status");
+    expect(allNames).toContain("get");
+    expect(allNames).toContain("info");
+    expect(allNames).toContain("view");
+    expect(allNames).toContain("update");
+    expect(allNames).toContain("connect");
+    expect(allNames).toContain("forward");
   });
 });
