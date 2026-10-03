@@ -11,7 +11,7 @@ describe("Webhook CLI Commands", () => {
     expect(commandNames).toContain("webhook");
   });
 
-  it("registers all webhook subcommands: list, get, create, update, delete, test, rotate-secret, verify", () => {
+  it("registers all webhook subcommands: list, view, create, update, delete, test, rotate-secret, verify-signature", () => {
     const program = new Command();
     registerWebhookCommands(program);
 
@@ -20,23 +20,34 @@ describe("Webhook CLI Commands", () => {
 
     const subNames = webhookCmd!.commands.map((c) => c.name());
     expect(subNames).toContain("list");
-    expect(subNames).toContain("get");
+    expect(subNames).toContain("view");
     expect(subNames).toContain("create");
     expect(subNames).toContain("update");
     expect(subNames).toContain("delete");
     expect(subNames).toContain("test");
     expect(subNames).toContain("rotate-secret");
-    expect(subNames).toContain("verify");
+    expect(subNames).toContain("verify-signature");
   });
 
-  it("registers ping as an alias for test", () => {
+  it("registers view aliases (info, show) and ping alias for test without legacy get/verify", () => {
     const program = new Command();
     registerWebhookCommands(program);
 
     const webhookCmd = program.commands.find((c) => c.name() === "webhook");
+    const viewCmd = webhookCmd!.commands.find((c) => c.name() === "view");
+    expect(viewCmd).toBeDefined();
+    expect(viewCmd!.aliases()).toContain("info");
+    expect(viewCmd!.aliases()).toContain("show");
+    expect(viewCmd!.aliases()).not.toContain("get");
+
     const testCmd = webhookCmd!.commands.find((c) => c.name() === "test");
     expect(testCmd).toBeDefined();
     expect(testCmd!.aliases()).toContain("ping");
+
+    const verifyCmd = webhookCmd!.commands.find((c) => c.name() === "verify-signature");
+    expect(verifyCmd).toBeDefined();
+    expect(verifyCmd!.aliases()).toContain("check-signature");
+    expect(verifyCmd!.aliases()).not.toContain("verify");
   });
 
   it("registers appropriate options for webhook create and list", () => {
@@ -61,12 +72,12 @@ describe("Webhook CLI Commands", () => {
     expect(listOptNames).toContain("offset");
   });
 
-  it("registers appropriate options for webhook verify", () => {
+  it("registers appropriate options for webhook verify-signature", () => {
     const program = new Command();
     registerWebhookCommands(program);
 
     const webhookCmd = program.commands.find((c) => c.name() === "webhook");
-    const verifyCmd = webhookCmd!.commands.find((c) => c.name() === "verify");
+    const verifyCmd = webhookCmd!.commands.find((c) => c.name() === "verify-signature");
     const verifyOptNames = verifyCmd!.options.map((o) => o.name());
     expect(verifyOptNames).toContain("payload");
     expect(verifyOptNames).toContain("payload-file");

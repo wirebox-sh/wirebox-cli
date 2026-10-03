@@ -93,8 +93,9 @@ export function registerWebhookCommands(program: Command): void {
       );
 
     parent
-      .command("get <id>")
-      .description("Retrieve full details for a specific webhook endpoint")
+      .command("view <id>")
+      .aliases(["info", "show"])
+      .description("View full details and status for a specific webhook endpoint")
       .action(
         withErrorHandler(async function (this: Command, id: string) {
           const opts = getGlobalOpts(this);
@@ -339,7 +340,8 @@ export function registerWebhookCommands(program: Command): void {
       );
 
     parent
-      .command("verify")
+      .command("verify-signature")
+      .alias("check-signature")
       .description("Verify the HMAC-SHA256 signature of a received webhook payload locally")
       .option("--payload <string>", "Raw payload JSON string")
       .option("--payload-file <file>", "Path to file containing raw JSON payload")
