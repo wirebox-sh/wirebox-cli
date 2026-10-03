@@ -133,13 +133,14 @@ export function registerIMessageCommands(program: Command): void {
         if (cmdOpts.raw) {
           const rows = res.data.map((c) => ({
             id: c.id,
+            identity_id: c.identity_id,
             user_phone: c.user_phone,
             status: c.status,
             unread_count: c.unread_count,
             last_message: c.last_message?.text || (c.last_message?.has_media ? "[Media]" : "-"),
             updated_at: c.updated_at,
           }));
-          output(rows, { columns: ["id", "user_phone", "status", "unread_count", "last_message", "updated_at"] });
+          output(rows, { columns: CONVERSATION_COLUMNS });
           return;
         }
 

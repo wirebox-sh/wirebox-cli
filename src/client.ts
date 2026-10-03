@@ -50,7 +50,8 @@ export function readConfigFile(): { apiKey?: string; baseUrl?: string } {
       if (key === "base_url" || key === "baseUrl") out.baseUrl = value;
     }
     if (!out.apiKey && content.startsWith("wb_live_")) {
-      out.apiKey = content.split("\n")[0].trim();
+      const first = content.split("\n")[0];
+      if (first) out.apiKey = first.trim();
     }
     return out;
   } catch {

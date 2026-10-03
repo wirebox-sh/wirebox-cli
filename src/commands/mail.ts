@@ -8,16 +8,7 @@ import type { SendEmailAttachment } from "@wirebox-sh/sdk";
 import type { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { withErrorHandler } from "../errors.js";
-import { output } from "../output.js";
-
-const MESSAGE_COLUMNS = [
-  "id",
-  "direction",
-  "from_address",
-  "subject",
-  "status",
-  "created_at",
-];
+import { output, formatRelativeTime } from "../output.js";
 
 function collect(val: string, prev: string[]): string[] {
   prev.push(val);
@@ -93,15 +84,31 @@ export function registerMailCommands(program: Command): void {
           attachments,
         });
 
-        output(
-          {
-            message_id: res.message_id,
-            from: res.mailbox_address,
-            status: res.status,
-            created_at: res.created_at,
-          },
-          { json: !!opts.json }
-        );
+        if (opts.json) {
+          output(res, { json: true });
+          return;
+        }
+
+        const messageId = res.id || (res as any).message_id || "-";
+        const threadId = res.thread_id || "-";
+        const fromAddress = res.mailbox_address || agent.mailbox?.email_address || "-";
+
+        console.log("\nEmail dispatched successfully:\n");
+        console.log(`  ID:          ${messageId}`);
+        if (threadId !== "-") {
+          console.log(`  Thread ID:   ${threadId}`);
+        }
+        console.log(`  From:        ${fromAddress}`);
+        console.log(`  To:          ${cmdOpts.to}`);
+        if (cmdOpts.cc) {
+          console.log(`  CC:          ${cmdOpts.cc}`);
+        }
+        console.log(`  Subject:     ${cmdOpts.subject}`);
+        if (attachments && attachments.length > 0) {
+          console.log(`  Attachments: ${attachments.map((a) => a.filename).join(", ")}`);
+        }
+        console.log(`  Status:      Sent`);
+        console.log();
       })
     );
 
@@ -136,16 +143,34 @@ export function registerMailCommands(program: Command): void {
           return;
         }
 
-        const rows = res.messages.map((m) => ({
-          id: m.id,
-          direction: m.direction,
-          from_address: m.from_address,
-          subject: m.subject,
-          status: m.status,
-          created_at: m.created_at.slice(0, 19).replace("T", " "),
-        }));
+        const messages = res.messages || [];
+        if (messages.length === 0) {
+          console.log("No messages in mailbox.");
+          return;
+        }
 
-        output(rows, { columns: MESSAGE_COLUMNS });
+        console.log();
+        for (const m of messages) {
+          const isOutbound = m.direction === "outbound";
+          const dirTag = isOutbound ? "▲ OUTBOUND" : "▼ INBOUND ";
+          const targetLabel = isOutbound ? "To:     " : "From:   ";
+          const targetValue = isOutbound
+            ? (Array.isArray(m.to) ? m.to.join(", ") : (m.to_addresses ? m.to_addresses.join(", ") : "-"))
+            : (m.from || m.from_address || "-");
+          const created = formatRelativeTime(m.created_at);
+
+          console.log(`  ${dirTag}  ${m.id}`);
+          console.log(`    ${targetLabel} ${targetValue}`);
+          console.log(`    Subject: ${m.subject || "(no subject)"}`);
+          if (m.snippet) {
+            console.log(`    Snippet: ${m.snippet.slice(0, 100)}`);
+          }
+          console.log(`    Date:    ${created}`);
+          console.log();
+        }
+
+        const countStr = messages.length === 1 ? "1 message" : `${messages.length} messages`;
+        console.log(`${countStr} in mailbox. Run 'wirebox mail get <message-id>' to view contents.\n`);
       })
     );
 
@@ -165,18 +190,47 @@ export function registerMailCommands(program: Command): void {
           return;
         }
 
-        output({
-          "Message ID": email.id,
-          "Direction": email.direction,
-          "From": email.from_address,
-          "To": email.to_addresses.join(", "),
-          "CC": email.cc_addresses.join(", ") || "-",
-          "Subject": email.subject,
-          "Status": email.status,
-          "Created At": email.created_at,
-          "Attachments": email.attachments.map((a) => a.filename).join(", ") || "None",
-          "Body (Text)": email.text || "(empty)",
-        });
+        const toList = email.to || email.to_addresses || [];
+        const toStr = Array.isArray(toList) ? toList.join(", ") : String(toList);
+
+        const ccList = email.cc || email.cc_addresses || [];
+        const ccStr = Array.isArray(ccList) && ccList.length > 0 ? ccList.join(", ") : undefined;
+
+        const bccList = email.bcc || email.bcc_addresses || [];
+        const bccStr = Array.isArray(bccList) && bccList.length > 0 ? bccList.join(", ") : undefined;
+
+        const fromStr = email.from || email.from_address || "-";
+        const dirTag = email.direction === "outbound" ? "▲ OUTBOUND" : "▼ INBOUND ";
+        const attachStr = email.attachments && email.attachments.length > 0
+          ? email.attachments.map((a: any) => `${a.filename} (${a.content_type || "attachment"})`).join(", ")
+          : undefined;
+
+        console.log();
+        console.log(`  ${dirTag}  ${email.id}`);
+        console.log(`  From:        ${fromStr}`);
+        console.log(`  To:          ${toStr}`);
+        if (ccStr) console.log(`  CC:          ${ccStr}`);
+        if (bccStr) console.log(`  BCC:         ${bccStr}`);
+        console.log(`  Subject:     ${email.subject || "(no subject)"}`);
+        console.log(`  Date:        ${formatRelativeTime(email.created_at)} (${email.created_at ? email.created_at.slice(0, 19).replace("T", " ") : "-"})`);
+        if (attachStr) console.log(`  Attachments: ${attachStr}`);
+        if (email.thread_id) console.log(`  Thread ID:   ${email.thread_id}`);
+        console.log();
+        console.log("  ------------------------------ Message Body ------------------------------");
+        console.log();
+        if (email.text) {
+          console.log(email.text);
+        } else if (email.html) {
+          console.log(email.html);
+        } else {
+          console.log("  (no text content)");
+        }
+        console.log();
+        console.log("  --------------------------------------------------------------------------");
+        console.log();
+        console.log(`💡 Next step:`);
+        console.log(`  - Reply to this message: wirebox mail reply ${email.id} --text "Your reply here"`);
+        console.log();
       })
     );
 
@@ -200,15 +254,23 @@ export function registerMailCommands(program: Command): void {
           html: cmdOpts.html,
         });
 
-        output(
-          {
-            message_id: res.message_id,
-            from: res.mailbox_address,
-            status: res.status,
-            created_at: res.created_at,
-          },
-          { json: !!opts.json }
-        );
+        if (opts.json) {
+          output(res, { json: true });
+          return;
+        }
+
+        const replyId = (res as any).id || res.message_id || "-";
+        const threadId = (res as any).thread_id || "-";
+
+        console.log(`\nReply sent successfully:\n`);
+        console.log(`  ID:          ${replyId}`);
+        if (threadId !== "-") {
+          console.log(`  Thread ID:   ${threadId}`);
+        }
+        console.log(`  In Reply To: ${messageId}`);
+        console.log(`  From:        ${agent.mailbox?.email_address || res.mailbox_address || "-"}`);
+        console.log(`  Status:      Sent`);
+        console.log();
       })
     );
 
