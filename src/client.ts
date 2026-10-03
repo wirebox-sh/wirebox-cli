@@ -27,33 +27,42 @@ export function getGlobalOpts(cmd: Command): GlobalOpts {
 export function readConfigFile(): { apiKey?: string; baseUrl?: string } {
   try {
     const home = process.env.WIREBOX_HOME || os.homedir();
-    const configPath = process.env.WIREBOX_CONFIG_PATH || path.join(home, ".wirebox", "config");
-    if (!fs.existsSync(configPath)) return {};
-    const content = fs.readFileSync(configPath, "utf-8").trim();
-    if (content.startsWith("{")) {
-      try {
-        const parsed = JSON.parse(content);
-        return {
-          apiKey: (parsed.api_key || parsed.apiKey || "").trim() || undefined,
-          baseUrl: (parsed.base_url || parsed.baseUrl || "").trim() || undefined,
-        };
-      } catch {}
+    const hasCustomPath = Boolean(process.env.WIREBOX_CREDENTIALS_PATH || process.env.WIREBOX_CONFIG_PATH);
+    const candidatePaths = hasCustomPath
+      ? ([process.env.WIREBOX_CREDENTIALS_PATH, process.env.WIREBOX_CONFIG_PATH].filter(Boolean) as string[])
+      : [path.join(home, ".wirebox", "credentials"), path.join(home, ".wirebox", "config")];
+
+    for (const configPath of candidatePaths) {
+      if (!fs.existsSync(configPath)) continue;
+      const content = fs.readFileSync(configPath, "utf-8").trim();
+      if (!content) continue;
+
+      if (content.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(content);
+          return {
+            apiKey: (parsed.api_key || parsed.apiKey || "").trim() || undefined,
+            baseUrl: (parsed.base_url || parsed.baseUrl || "").trim() || undefined,
+          };
+        } catch {}
+      }
+      const out: { apiKey?: string; baseUrl?: string } = {};
+      for (const raw of content.split("\n")) {
+        const line = raw.trim();
+        if (!line || line.startsWith("#") || !line.includes("=")) continue;
+        const eq = line.indexOf("=");
+        const key = line.slice(0, eq).trim();
+        const value = line.slice(eq + 1).trim().replace(/^['"]|['"]$/g, "");
+        if (key === "api_key" || key === "apiKey") out.apiKey = value;
+        if (key === "base_url" || key === "baseUrl") out.baseUrl = value;
+      }
+      if (!out.apiKey && (content.startsWith("wb_live_") || content.startsWith("wb_test_"))) {
+        const first = content.split("\n")[0];
+        if (first) out.apiKey = first.trim();
+      }
+      if (out.apiKey || out.baseUrl) return out;
     }
-    const out: { apiKey?: string; baseUrl?: string } = {};
-    for (const raw of content.split("\n")) {
-      const line = raw.trim();
-      if (!line || line.startsWith("#") || !line.includes("=")) continue;
-      const eq = line.indexOf("=");
-      const key = line.slice(0, eq).trim();
-      const value = line.slice(eq + 1).trim().replace(/^['"]|['"]$/g, "");
-      if (key === "api_key" || key === "apiKey") out.apiKey = value;
-      if (key === "base_url" || key === "baseUrl") out.baseUrl = value;
-    }
-    if (!out.apiKey && content.startsWith("wb_live_")) {
-      const first = content.split("\n")[0];
-      if (first) out.apiKey = first.trim();
-    }
-    return out;
+    return {};
   } catch {
     return {};
   }
