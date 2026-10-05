@@ -50,5 +50,10 @@ describe("CLI Command Registration", () => {
     expect(subNames).toContain("get");
     expect(subNames).toContain("reply");
     expect(subNames).toContain("delete");
+    expect(subNames).toContain("rules");
+    expect(subNames).toContain("policy");
+
+    const mailRulesTopCmd = program.commands.find((c) => c.name() === "mail-rules");
+    expect(mailRulesTopCmd).toBeUndefined();
   });
 });

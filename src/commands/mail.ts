@@ -9,6 +9,7 @@ import type { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { withErrorHandler } from "../errors.js";
 import { output, formatRelativeTime } from "../output.js";
+import { registerMailRulesCommands } from "./mail_rules.js";
 
 function collect(val: string, prev: string[]): string[] {
   prev.push(val);
@@ -292,4 +293,7 @@ export function registerMailCommands(program: Command): void {
         }
       })
     );
+
+  // Attach mail rules and security policy subcommands
+  registerMailRulesCommands(mail);
 }
