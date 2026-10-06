@@ -49,6 +49,7 @@ describe("CLI Command Registration", () => {
     expect(subNames).toContain("list");
     expect(subNames).toContain("get");
     expect(subNames).toContain("reply");
+    expect(subNames).toContain("forward");
     expect(subNames).toContain("delete");
     expect(subNames).toContain("rules");
     expect(subNames).toContain("policy");

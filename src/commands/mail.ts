@@ -10,6 +10,7 @@ import { createClient, getGlobalOpts } from "../client.js";
 import { withErrorHandler } from "../errors.js";
 import { output, formatRelativeTime } from "../output.js";
 import { registerMailRulesCommands } from "./mail_rules.js";
+import { registerDraftCommands } from "./draft.js";
 
 function collect(val: string, prev: string[]): string[] {
   prev.push(val);
@@ -229,8 +230,9 @@ export function registerMailCommands(program: Command): void {
         console.log();
         console.log("  --------------------------------------------------------------------------");
         console.log();
-        console.log(`💡 Next step:`);
-        console.log(`  - Reply to this message: wirebox mail reply ${email.id} --text "Your reply here"`);
+        console.log(`💡 Next steps:`);
+        console.log(`  - Reply to this message:   wirebox mail reply ${email.id} --text "Your reply here"`);
+        console.log(`  - Forward this message: wirebox mail forward ${email.id} --to recipient@example.com`);
         console.log();
       })
     );
@@ -276,6 +278,88 @@ export function registerMailCommands(program: Command): void {
     );
 
   mail
+    .command("forward <message-id>")
+    .description("Forward an email message to new recipients, preserving attachments and quote headers")
+    .option("-i, --identity <handle>", "Agent identity handle (defaults to scoped identity)")
+    .requiredOption("--to <addresses>", "Comma-separated recipient addresses")
+    .option("--subject <subject>", "Override forwarded subject line (defaults to 'Fwd: <original>')")
+    .option("--comment <text>", "Commentary note prepended above forwarded content (alias for --text)")
+    .option("--text <body>", "Plain text commentary note prepended above forwarded content")
+    .option("--html <html>", "Rich HTML commentary note prepended above forwarded content")
+    .option("--cc <addresses>", "Comma-separated CC addresses")
+    .option("--bcc <addresses>", "Comma-separated BCC addresses")
+    .option("--no-attachments", "Do not include original email attachments (default: true)")
+    .option("--attach <path>", "Attach additional files (repeatable)", collect, [])
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        messageId: string,
+        cmdOpts: {
+          identity?: string;
+          to: string;
+          subject?: string;
+          comment?: string;
+          text?: string;
+          html?: string;
+          cc?: string;
+          bcc?: string;
+          attachments?: boolean;
+          attach: string[];
+        }
+      ) {
+        const opts = getGlobalOpts(this);
+        const client = createClient(opts);
+        const agent = await client.getIdentity(cmdOpts.identity);
+
+        const additionalAttachments =
+          cmdOpts.attach.length > 0 ? resolveAttachments(cmdOpts.attach) : undefined;
+
+        const forwardAttachments = cmdOpts.attachments !== false;
+
+        const res = await agent.forwardEmail(messageId, {
+          to: cmdOpts.to.split(",").map((s) => s.trim()),
+          subject: cmdOpts.subject,
+          body_text: cmdOpts.comment || cmdOpts.text,
+          body_html: cmdOpts.html,
+          cc: cmdOpts.cc ? cmdOpts.cc.split(",").map((s) => s.trim()) : undefined,
+          bcc: cmdOpts.bcc ? cmdOpts.bcc.split(",").map((s) => s.trim()) : undefined,
+          forward_attachments: forwardAttachments,
+          attachments: additionalAttachments,
+        });
+
+        if (opts.json) {
+          output(res, { json: true });
+          return;
+        }
+
+        const newMsgId = res.id || (res as any).message_id || "-";
+        const threadId = res.thread_id || "-";
+
+        console.log(`\nEmail forwarded successfully:\n`);
+        console.log(`  ID:          ${newMsgId}`);
+        if (threadId !== "-") {
+          console.log(`  Thread ID:   ${threadId}`);
+        }
+        console.log(`  Original:    ${messageId}`);
+        console.log(`  From:        ${agent.mailbox?.email_address || "-"}`);
+        console.log(`  To:          ${cmdOpts.to}`);
+        if (cmdOpts.cc) {
+          console.log(`  CC:          ${cmdOpts.cc}`);
+        }
+        if (cmdOpts.subject) {
+          console.log(`  Subject:     ${cmdOpts.subject}`);
+        }
+        console.log(
+          `  Attachments: ${forwardAttachments ? "Original retained" : "Omitted"}${
+            additionalAttachments ? ` (+${additionalAttachments.length} additional)` : ""
+          }`
+        );
+        console.log(`  Status:      Sent`);
+        console.log();
+      })
+    );
+
+  mail
     .command("delete <message-id>")
     .description("Delete an email message from the mailbox")
     .option("-i, --identity <handle>", "Agent identity handle")
@@ -296,4 +380,6 @@ export function registerMailCommands(program: Command): void {
 
   // Attach mail rules and security policy subcommands
   registerMailRulesCommands(mail);
+  // Attach draft management subcommands
+  registerDraftCommands(mail);
 }
