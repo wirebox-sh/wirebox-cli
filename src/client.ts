@@ -8,7 +8,7 @@ import * as path from "node:path";
 import { Wirebox } from "@wirebox-sh/sdk";
 import type { Command } from "commander";
 
-export const CLI_VERSION = "0.8.0";
+export const CLI_VERSION = "0.8.1";
 
 export interface GlobalOpts {
   apiKey?: string;
