@@ -47,6 +47,7 @@ describe("CLI Command Registration", () => {
     const subNames = mailCmd!.commands.map((c) => c.name());
     expect(subNames).toContain("send");
     expect(subNames).toContain("list");
+    expect(subNames).toContain("search");
     expect(subNames).toContain("get");
     expect(subNames).toContain("reply");
     expect(subNames).toContain("forward");

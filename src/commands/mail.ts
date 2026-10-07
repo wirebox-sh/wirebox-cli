@@ -177,6 +177,68 @@ export function registerMailCommands(program: Command): void {
     );
 
   mail
+    .command("search")
+    .description("Search messages in an agent identity mailbox")
+    .option("-i, --identity <handle>", "Agent identity handle")
+    .requiredOption("-q, --query <query>", "Full-text search query")
+    .option("--limit <n>", "Max results", (v) => parseInt(v, 10))
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { identity?: string; query: string; limit?: number }
+      ) {
+        const opts = getGlobalOpts(this);
+        const client = createClient(opts);
+        const agent = await client.getIdentity(cmdOpts.identity);
+        const res = await agent.searchMessages({
+          q: cmdOpts.query,
+          limit: cmdOpts.limit,
+        });
+
+        if (opts.json) {
+          output(res, { json: true });
+          return;
+        }
+
+        const messages = res.messages || [];
+        if (messages.length === 0) {
+          console.log(`No messages matched "${cmdOpts.query}".`);
+          return;
+        }
+
+        console.log();
+        for (const m of messages) {
+          const isOutbound = m.direction === "outbound";
+          const dirTag = isOutbound ? "▲ OUTBOUND" : "▼ INBOUND ";
+          const targetLabel = isOutbound ? "To:     " : "From:   ";
+          const targetValue = isOutbound
+            ? Array.isArray(m.to)
+              ? m.to.join(", ")
+              : m.to_addresses
+                ? m.to_addresses.join(", ")
+                : "-"
+            : m.from || m.from_address || "-";
+          const created = formatRelativeTime(m.created_at);
+
+          console.log(`  ${dirTag}  ${m.id}`);
+          console.log(`    ${targetLabel} ${targetValue}`);
+          console.log(`    Subject: ${m.subject || "(no subject)"}`);
+          const matchPreview = m.highlight || m.snippet;
+          if (matchPreview) {
+            console.log(`    Match:   ${matchPreview.slice(0, 120)}`);
+          }
+          console.log(`    Date:    ${created}`);
+          console.log();
+        }
+
+        const countStr = messages.length === 1 ? "1 match" : `${messages.length} matches`;
+        console.log(
+          `${countStr} for "${cmdOpts.query}". Run 'wirebox mail get <message-id>' to view contents.\n`
+        );
+      })
+    );
+
+  mail
     .command("get <message-id>")
     .description("Retrieve full email content (headers, body text, HTML, attachments)")
     .option("-i, --identity <handle>", "Agent identity handle")
