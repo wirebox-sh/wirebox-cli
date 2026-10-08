@@ -8,6 +8,7 @@ import { registerMailCommands } from "./commands/mail.js";
 import { registerPhoneCommands } from "./commands/phone.js";
 import { registerSignupCommands } from "./commands/signup.js";
 import { registerTunnelCommands } from "./commands/tunnel.js";
+import { registerVaultCommands } from "./commands/vault.js";
 import { registerWebhookCommands } from "./commands/webhook.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
 
@@ -26,6 +27,7 @@ registerMailCommands(program);
 registerPhoneCommands(program);
 registerIMessageCommands(program);
 registerTunnelCommands(program);
+registerVaultCommands(program);
 registerWebhookCommands(program);
 
 program.parse();
