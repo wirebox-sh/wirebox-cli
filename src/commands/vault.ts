@@ -200,6 +200,25 @@ const PAYLOAD_FLAG_KEYS = ["username", "email", "password", "url", "totpUri", "k
 // Command registration
 // ---------------------------------------------------------------------------
 
+/** Resolve a secret name or id to its id. Ids (vsec_...) pass through; names are matched via metadata. */
+async function resolveSecretId(client: ReturnType<typeof createClient>, nameOrId: string): Promise<string> {
+  if (nameOrId.startsWith("vsec_")) return nameOrId;
+  const secrets = await client.vault.listSecrets();
+  const matches = secrets.filter((s) => s.name.toLowerCase() === nameOrId.toLowerCase());
+  if (matches.length === 1) return matches[0]!.id;
+  if (matches.length > 1) {
+    throw new Error(`Multiple secrets are named '${nameOrId}'. Use the secret id (vsec_...) to disambiguate.`);
+  }
+  throw new Error(`No secret named or identified by '${nameOrId}'.`);
+}
+
+/** Resolve an agent handle (@eva or eva) or id (agt_...) to its identity id. */
+async function resolveIdentityId(client: ReturnType<typeof createClient>, handleOrId: string): Promise<string> {
+  if (handleOrId.startsWith("agt_")) return handleOrId;
+  const identity = await client.getIdentity(handleOrId.replace(/^@/, ""));
+  return identity.id;
+}
+
 export function registerVaultCommands(program: Command): void {
   const vault = program.command("vault").description("Encrypted credential vault for agent identities");
 
@@ -245,7 +264,7 @@ export function registerVaultCommands(program: Command): void {
     );
 
   vault
-    .command("get <secret-id>")
+    .command("get <name-or-id>")
     .description("Get a secret; secret values are masked unless --reveal is set")
     .option("--vault-key <key>", "Vault key (or set WIREBOX_VAULT_KEY)")
     .option("--field <name>", "Print only this payload field's raw value")
@@ -318,7 +337,7 @@ export function registerVaultCommands(program: Command): void {
     );
 
   vault
-    .command("set <secret-id>")
+    .command("set <name-or-id>")
     .description("Update a secret's metadata and/or payload fields")
     .option("--vault-key <key>", "Vault key (or set WIREBOX_VAULT_KEY)")
     .option("--name <name>", "New label")
@@ -355,19 +374,21 @@ export function registerVaultCommands(program: Command): void {
     );
 
   vault
-    .command("rm <secret-id>")
-    .description("Delete a secret permanently")
+    .command("rm <name-or-id>")
+    .description("Delete a secret permanently (by name or id)")
     .action(
-      withErrorHandler(async function (this: Command, secretId: string) {
+      withErrorHandler(async function (this: Command, nameOrId: string) {
         const opts = getGlobalOpts(this);
-        await createClient(opts).vault.deleteSecret(secretId);
-        if (opts.json) output({ deleted: secretId }, { json: true });
-        else console.log(`Deleted secret '${secretId}'.`);
+        const client = createClient(opts);
+        const id = await resolveSecretId(client, nameOrId);
+        await client.vault.deleteSecret(id);
+        if (opts.json) output({ deleted: id }, { json: true });
+        else console.log(`Deleted secret '${nameOrId}'.`);
       })
     );
 
   vault
-    .command("totp <secret-id>")
+    .command("totp <name-or-id>")
     .description("Print the current TOTP code for a login secret")
     .option("--vault-key <key>", "Vault key (or set WIREBOX_VAULT_KEY)")
     .action(
@@ -384,38 +405,50 @@ export function registerVaultCommands(program: Command): void {
   const access = vault.command("access").description("Manage per-secret identity access grants");
 
   access
-    .command("grant <secret-id>")
+    .command("grant <name-or-id>")
     .description("Grant an agent identity access to a secret")
-    .requiredOption("-i, --identity <id>", "Agent identity id (agt_...)")
+    .requiredOption("-i, --identity <handle-or-id>", "Agent identity handle (@eva) or id (agt_...)")
     .action(
-      withErrorHandler(async function (this: Command, secretId: string, cmdOpts: { identity: string }) {
+      withErrorHandler(async function (this: Command, nameOrId: string, cmdOpts: { identity: string }) {
         const opts = getGlobalOpts(this);
-        const grant = await createClient(opts).vault.grantAccess(secretId, cmdOpts.identity);
+        const client = createClient(opts);
+        const [secretId, identityId] = await Promise.all([
+          resolveSecretId(client, nameOrId),
+          resolveIdentityId(client, cmdOpts.identity),
+        ]);
+        const grant = await client.vault.grantAccess(secretId, identityId);
         if (opts.json) output(grant as unknown as Record<string, unknown>, { json: true });
-        else console.log(`Granted '${cmdOpts.identity}' access to secret '${secretId}'.`);
+        else console.log(`Granted '${cmdOpts.identity}' access to secret '${nameOrId}'.`);
       })
     );
 
   access
-    .command("revoke <secret-id>")
+    .command("revoke <name-or-id>")
     .description("Revoke an agent identity's access to a secret")
-    .requiredOption("-i, --identity <id>", "Agent identity id (agt_...)")
+    .requiredOption("-i, --identity <handle-or-id>", "Agent identity handle (@eva) or id (agt_...)")
     .action(
-      withErrorHandler(async function (this: Command, secretId: string, cmdOpts: { identity: string }) {
+      withErrorHandler(async function (this: Command, nameOrId: string, cmdOpts: { identity: string }) {
         const opts = getGlobalOpts(this);
-        await createClient(opts).vault.revokeAccess(secretId, cmdOpts.identity);
+        const client = createClient(opts);
+        const [secretId, identityId] = await Promise.all([
+          resolveSecretId(client, nameOrId),
+          resolveIdentityId(client, cmdOpts.identity),
+        ]);
+        await client.vault.revokeAccess(secretId, identityId);
         if (opts.json) output({ revoked: cmdOpts.identity, secret_id: secretId }, { json: true });
-        else console.log(`Revoked '${cmdOpts.identity}' access to secret '${secretId}'.`);
+        else console.log(`Revoked '${cmdOpts.identity}' access to secret '${nameOrId}'.`);
       })
     );
 
   access
-    .command("list <secret-id>")
+    .command("list <name-or-id>")
     .description("List identities granted access to a secret")
     .action(
-      withErrorHandler(async function (this: Command, secretId: string) {
+      withErrorHandler(async function (this: Command, nameOrId: string) {
         const opts = getGlobalOpts(this);
-        const grants = await createClient(opts).vault.listAccess(secretId);
+        const client = createClient(opts);
+        const secretId = await resolveSecretId(client, nameOrId);
+        const grants = await client.vault.listAccess(secretId);
         output(grants as unknown as Record<string, unknown>[], { json: !!opts.json, columns: ACCESS_COLUMNS });
       })
     );
