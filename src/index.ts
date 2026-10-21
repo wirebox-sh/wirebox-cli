@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import { CLI_VERSION } from "./client.js";
+import { registerA2ACommands } from "./commands/a2a.js";
 import { registerIdentityCommands } from "./commands/identity.js";
 import { registerIMessageCommands } from "./commands/imessage.js";
 import { registerMailCommands } from "./commands/mail.js";
@@ -29,5 +30,6 @@ registerIMessageCommands(program);
 registerTunnelCommands(program);
 registerVaultCommands(program);
 registerWebhookCommands(program);
+registerA2ACommands(program);
 
 program.parse();
